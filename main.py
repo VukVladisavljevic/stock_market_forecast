@@ -69,4 +69,7 @@ def run(training_set, test_set):
 
     predicted = classifier.predict(y_transformed)
 
-    print(f1_score(y_test, predicted, average='micro') )
+
+
+
+    rmse = calculate_rmse(x_transformed, y_transformed, -1, -1)

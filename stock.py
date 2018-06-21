@@ -4,190 +4,139 @@ koje ne sadrze odgovarajucu vrednost ili drasticno uticu na tacnost procene.
 Nakon toga ce uslediti  pretvaranje kategorickih kolona, min-max normalizacija, uklanjanje outliera po potrebi.
 Verovatno koriscenje PCA algoritma i konacno procena vrednosti koriscenjem neke od regresionih metoda.
 
-
 """
 
-# import relevant modules
 import pandas as pd
 import numpy as np
 import quandl, math
 import datetime
 
-# Machine Learning
-from sklearn import preprocessing, cross_validation, svm
-from sklearn.linear_model import LinearRegression
-
-#Visualization
+from sklearn import preprocessing, model_selection, svm
+from sklearn.linear_model import *
+from sklearn import metrics
+from sklearn.metrics import f1_score
+from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
-min_vrednost = -1
-max_vrednost = -1
-
-min_vrednost_y = -1
-max_vrednost_y = -1
-
-def normalize(x):
-    global min_vrednost
-    global max_vrednost
-    ret_x = list()
-    min_vrednost = x.min()
-    max_vrednost = x.max()
-    for i in range(0, len(x)):
-        val1 = x[i]-x.min()
-        val2 = x.max()-x.min()
-        ret_x.append(val1/val2)
-    return ret_x
-
-def normalize_y(x):
-    global min_vrednost_y
-    global max_vrednost_y
-    ret_x = list()
-    min_vrednost_y = x.min()
-    max_vrednost = x.max()
-    for i in range(0, len(x)):
-        val1 = x[i]-x.min()
-        val2 = x.max()-x.min()
-        ret_x.append(val1/val2)
-    return ret_x
-
-def normalize_test_y(x):
-    global min_vrednost_y
-    global max_vrednost_y
-    ret_x = list()
-    for i in range(0, len(x)):
-        val1 = x[i]-min_vrednost_y
-        val2 = max_vrednost_y-min_vrednost_y
-        ret_x.append(val1/val2)
-    return ret_x
-
-def normalize_test(x):
-    global min_vrednost
-    global max_vrednost
-    ret_x = list()
-    for i in range(0, len(x)):
-        val1 = x[i]-min_vrednost
-        val2 = max_vrednost-min_vrednost
-        ret_x.append(val1/val2)
-    return ret_x
-
-
-def denormalize(x):
-    global min_vrednost_y
-    global max_vrednost
-    denormalized_values = list()
-    for i in range(0, len(x)):
-        val = x[i]*(max_vrednost_y - min_vrednost_y) + min_vrednost_y
-        denormalized_values.append(val)
-    return denormalized_values
-
-
-def calculate_rmse(x, y, b, m):
-    error_sum = 0
-    predicted_y_values = list()
-    for i in range(0, len(x)):
-        predicted_y_values.append(m*x[i] + b)
-
-    denorm_y_predicted = denormalize(predicted_y_values)
-    for i in range(0, len(x)):
-        prediction_error = denorm_y_predicted[i] - y[i]
-        error_sum += (prediction_error ** 2)
-
-    mean_error = error_sum / float(len(x))
-    return math.sqrt(mean_error)
-
-
-def remove_outliers(x, y):
-    x_list = list()
-    y_list = list()
-
-    for i in range(0, len(x)):
-        if(x[i] < 3050 and y[i] > 1200):
-            continue
-
-        if(x[i]> 4100  and y[i] < 1350):
-            continue
-        x_list.append(x[i])
-        y_list.append(y[i])
-
-
-    return np.asarray(x_list), np.asarray(y_list)
-
-def gradient_descent_function(x1, y1, alpha_value, num_iterations):
-    b = -1
-    m = -1
-    size = len(x1)
-
-    for i in range(num_iterations):
-        for j in range(0, len(x1)):
-            x = x1[j]
-            y = y1[j]
-            b -= alpha_value*(-(2/size) * (y - ((m * x) + b)))
-            m -= alpha_value*(-(2/size) * x * (y - ((m * x) + b)))
-    return b, m
 
 def discard_columns(data):
 
-    "Removing columns that aren't needed for this forecast"
-    columns = ['Open', 'High', 'Low', 'Close', 'Volume', 'Ex-Dividend', 'Split Ratio', 'Adj. Volume','Adj. High', 'Adj. Low']
+    #Removing columns that aren't needed for this forecast
+    columns = ['Open', 'High', 'Low', 'Close', 'Volume', 'Ex-Dividend',
+               'Split Ratio','Adj. High', 'Adj. Low','Adj. Open']
     data.drop(columns, inplace=True, axis=1)
     return data
 
 def calculate_average_price(row):
     return (row['Adj. High'] + row['Adj. Low']) / 2
 
+def calculate_change(row):
+    return (row['Adj. Close'] - row['Adj. Open']) / row['Adj. Open']
+
+def remove_nan_cells(data):
+
+    #handling the NaN and empty cells
+    data.replace('', np.nan, inplace=True)
+    data = data.dropna(thresh=5)
+
+    return data
+
+
+def remove_outliers(data):
+    temp_data = data;
+    plt.plot(temp_data['Adj. Volume'])
+    plt.show()
+
+    indexes_to_drop = []
+    for i in range(len(data.index)):
+        if abs(temp_data['Adj. Volume'][i]) > 10000000 :
+            indexes_to_drop.append(i)
+
+    for i in range(len(data.index)):
+        if abs(temp_data['change_percentage'][i]) > 0.03 :
+            indexes_to_drop.append(i)
+
+    temp_data.drop(temp_data.index[indexes_to_drop], inplace=True)
+
+    plt.plot(temp_data['Adj. Volume'])
+  #  plt.show()
+    return temp_data
+
 def run():
-    df = quandl.get("WIKI/AMZN")
-
-    "Calculate average price for each day"
+    quandl.ApiConfig.api_key = "3dEBs4nQPtZwzGqB7XZu"
+    #Loading Amazon\Google stock prices from Quandl server
+    df = quandl.get("WIKI/GOOGL", start_date="2012-12-31", end_date="2017-12-31")
+    print(df.head())
+    #creating new column with average daily price which will be predicted
+    #average_price column will be derived from Adj. High and Adj. Low columns
     df['average_price'] = df.apply(calculate_average_price, axis=1)
+    df['change_percentage'] = df.apply(calculate_change, axis=1)
 
-    "discard columns"
-    df = discard_columns(df)
+    #df = discard_columns(df)
 
-    # Visualization
 
+    #df = remove_outliers(df)
+
+
+    #Number of days for forecasting
+    forecast_period = 30
+
+    #Creating new column that will represent stock price in some future
+    #tj. predstavlja kolonu sa kojom cemo porediti vrednosti koje ce prognozirati algoritam
+    df['predicted_price'] = df['Adj. Close'].shift(-forecast_period)
+    df = remove_nan_cells(df)
+    #df.dropna(inplace=True)
+
+    X = df.loc[:, df.columns != 'predicted_price']
+    #ovo ispod pravi kao listu a gore je bas dataframe
+    #X = np.array(df.drop(['predicted_price'], 1))
+
+    y = df.loc[:, "predicted_price"]
+
+    #Normalizacija/Skaliranje/Standardizacija
+    scaler = preprocessing.MinMaxScaler()
+    X = scaler.fit_transform(X)
+
+
+
+    X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.1,  random_state=142)
+
+
+    regressor = Lasso()
+    regressor.fit(X_train, y_train)
+
+    y_pred = regressor.predict(X_test)
+
+    print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
+    df2 = pd.DataFrame({'Actual': y_test, 'Predicted': y_pred})
+    print(df2)
+
+    # Showing stock value over time
     df['average_price'].plot(figsize=(15, 6), color="green")
     plt.legend(loc=4)
     plt.xlabel('Date')
     plt.ylabel('Price')
-  #  plt.show()
+   # plt.show()
 
 
-    # pick a forecast column
-    forecast_col = 'average_price'
 
-    # Chosing 30 days as number of forecast days
-    forecast_out = int(30)
-
-    # Creating label by shifting 'Adj. Close' according to 'forecast_out'
-    df['prediction'] = df[forecast_col].shift(-forecast_out)
-
-    # Define features Matrix X by excluding the label column which we just created
-    X = np.array(df.drop(['prediction'], 1))
-
-    # Using a feature in sklearn, preposessing to scale features
-    X = normalize(X)
-   # print(X)
-
-    # X contains last 'n= forecast_out' rows for which we don't have label data
-    # Put those rows in different Matrix X_forecast_out by X_forecast_out = X[end-forecast_out:end]
-
-    X_forecast_out = X[-forecast_out:]
-    X = X[:-forecast_out]
-
-    # Similarly Define Label vector y for the data we have prediction for
-    # A good test is to make sure length of X and y are identical
-    y = np.array(df['prediction'])
-    y = y[:-forecast_out]
-
-    X_train, X_test, y_train, y_test = cross_validation.train_test_split(X, y, test_size=0.2)
-
-    clf = LinearRegression()
-    clf.fit(X_train, y_train)
-    # Test
-    accuracy = clf.score(X_test, y_test)
-    print("Accuracy of Linear Regression: ", accuracy)
+    """
+    X_test2 =(X_test-X_train.min())/(X_train.max()-X_train.min())
 
 
+    #PCA I KLASIFIKACIJA
+    pca = PCA(n_components=3)
+    regressor2 = svm.LinearSVR()
+    regressor2.fit(X_train, y_train)
+
+    pca.fit(X_train)
+    x_transformed = pca.transform(X_train)
+    y_transformed = pca.transform(X_test2)
+
+    regressor2.fit(x_transformed, y_train)
+
+    predicted2 = regressor2.predict(y_transformed)
+    print('Root Mean Squared Error:', np.sqrt(metrics.mean_squared_error(y_test, predicted2)))
+"""
 if __name__ == "__main__":
     run()
