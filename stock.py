@@ -10,8 +10,10 @@ import numpy as np
 import quandl, math
 import datetime
 
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import f_regression,mutual_info_regression
 from sklearn import preprocessing, model_selection, cross_decomposition
-from sklearn import linear_model
+from sklearn import linear_model, svm
 from sklearn.linear_model import *
 from sklearn import metrics
 import scipy as scipy
@@ -72,28 +74,35 @@ def calculate(company_codename, forecast_period):
 
     #creating new column with average daily price which will be predicted
     #average_price column will be derived from Adj. High and Adj. Low columns
-    df['average_price'] = df.apply(calculate_average_price, axis=1)
-    df['change_percentage'] = df.apply(calculate_change, axis=1)
+   # df['average_price'] = df.apply(calculate_average_price, axis=1)
+   #df['change_percentage'] = df.apply(calculate_change, axis=1)
 
-    df = discard_columns(df)
+   #df = discard_columns(df)
 
-    print(df.describe())
+   # print(df.describe())
     #df = remove_outliers(df)
 
     #Creating new column that will represent average stock price in some future
     # this column will be created by shifting average_price value so that the new
     # column represents average_price value predefined time in future
     # -1 tell to shift backwards, or to move cell values up
-    df['predicted_price'] = df['average_price'].shift(-forecast_period)
-    df = remove_nan_cells(df)
-
+    df['predicted_price'] = df['Adj. Close'].shift(-forecast_period)
+    #df = remove_nan_cells(df)
+    df.dropna(inplace=True)
 
     #Creating X that will contain features to base regression on
     X = df.loc[:, df.columns != 'predicted_price']
 
     #creating y that will contain labels to compare predicted values with
     y = df.loc[:, "predicted_price"]
+   # X.dropna(inplace=True)
 
+    test = SelectKBest(score_func=mutual_info_regression, k=5)
+    X = test.fit_transform(X, y)
+    # summarize scores
+    #np.set_printoptions()
+
+    #print(df.head())
     #Scaling X values
     scaler = preprocessing.MinMaxScaler()
     X = scaler.fit_transform(X)
@@ -101,7 +110,7 @@ def calculate(company_codename, forecast_period):
     #Creating train and test frames, by the 80% of all being training and 20% being testing values
     X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.2)
 
-    regressor = LinearRegression(n_jobs=-1)
+    regressor = Lasso(tol=0.01)
     regressor.fit(X_train, y_train)
 
     y_pred = regressor.predict(X_test)
@@ -120,8 +129,8 @@ def run() :
    # apple_dataframe = calculate("AAP")
    # microsoft_dataframe = calculate("MSFT")
 
-    google_dataframe['Actual'].plot(figsize=(15, 6), color="green")
-    google_dataframe['Predicted'].plot(figsize=(15, 6), color="red")
+    google_dataframe['Actual'].plot(figsize=(25, 11), color="green")
+    google_dataframe['Predicted'].plot(figsize=(25, 11), color="red")
     plt.legend(loc=4)
     plt.xlabel('Date')
     plt.ylabel('Price in USD')
@@ -129,7 +138,7 @@ def run() :
     #amazon_dataframe['average_price'].plot(figsize=(15, 6), color="blue")
    # apple_dataframe['average_price'].plot(figsize=(15, 6), color="red")
    # microsoft_dataframe['average_price'].plot(figsize=(15, 6), color="yellow")
-    plt.show()
+   # plt.show()
 
 
 
