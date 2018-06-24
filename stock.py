@@ -105,7 +105,7 @@ def calculate(company_codename, forecast_period):
     regressor.fit(X_train, y_train)
 
     y_pred = regressor.predict(X_test)
-    print("Root Mean Squared Error for prediction of" + company_codename + "average prices: ", np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
+    print("Root Mean Squared Error for prediction of " + company_codename + " average prices: ", np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
 
     confidence = regressor.score(X_test, y_test)
     print("Confidence for predicting " + company_codename + " average prices: " , confidence)
